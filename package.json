@@ -1,0 +1,13 @@
+{
+  "name": "skn29-final-3team",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SKN29 final 3team — Answervice monorepo entrypoint. Runs frontend contract + logic tests.",
+  "scripts": {
+    "test": "npm --prefix app/enterprise-react run test",
+    "test:contracts": "npm --prefix app/enterprise-react run test:contracts",
+    "test:agent": "npm --prefix app/enterprise-react run test:agent",
+    "build": "npm --prefix app/enterprise-react run build",
+    "install:frontend": "npm --prefix app/enterprise-react install"
+  }
+}

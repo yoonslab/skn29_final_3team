@@ -279,7 +279,7 @@ query Dataset($urn: String!) {
         gate_token: str,
     ) -> dict[str, Any]:
         if not gate_token:
-            raise ValueError("G2 gate token is required")
+            raise ValueError("SQL 안전성 검증 토큰이 필요합니다.")
         bound_sql = self._bind_date_parameters(sql, parameters)
         try:
             page = self._trino.execute(bound_sql)

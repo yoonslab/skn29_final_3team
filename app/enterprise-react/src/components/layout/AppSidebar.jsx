@@ -2,7 +2,6 @@ import {
   BookOpen,
   Building2,
   ChevronDown,
-  Database,
   FileBarChart,
   MessageSquareText,
   X,
@@ -12,28 +11,44 @@ import { PAGE_PATHS } from "../../routing";
 const NAVIGATION = [
   { id: "chat", path: PAGE_PATHS.chat, label: "분석 Agent", icon: MessageSquareText, group: "workspace" },
   { id: "reports", path: PAGE_PATHS.reports, label: "보고서", icon: FileBarChart, group: "workspace" },
-  { id: "catalog", path: PAGE_PATHS.catalog, label: "데이터 카탈로그", icon: BookOpen, group: "admin" },
-  { id: "connections", path: PAGE_PATHS.connections, label: "DB 연결 관리", icon: Database, group: "admin" },
+  { id: "catalog", path: PAGE_PATHS.catalog, label: "DataHub 카탈로그", icon: BookOpen, group: "data" },
 ];
 
+const ACTIVE_ACCENT_STYLE = {
+  position: "absolute",
+  left: 0,
+  top: "8px",
+  bottom: "8px",
+  width: "2px",
+  borderRadius: "2px",
+  background: "var(--gold, #d8b77d)",
+};
+
+const GROUP_LABELS = { workspace: "WORKSPACE", data: "DATA" };
+
 export function AppSidebar({ page, onNavigate, open, onClose }) {
-  const renderGroup = (group, title) => (
+  const renderGroup = (group) => (
     <>
-      <small className="nav-group">{title}</small>
-      {NAVIGATION.filter((item) => item.group === group).map(({ id, path, label, icon: Icon }) => (
-        <button
-          className={page === id ? "active" : ""}
-          aria-current={page === id ? "page" : undefined}
-          onClick={() => {
-            onNavigate(path);
-            onClose();
-          }}
-          key={id}
-        >
-          <Icon size={18} />
-          <span>{label}</span>
-        </button>
-      ))}
+      <small className="nav-group" style={{ textTransform: "uppercase" }}>{GROUP_LABELS[group]}</small>
+      {NAVIGATION.filter((item) => item.group === group).map(({ id, path, label, icon: Icon }) => {
+        const isActive = page === id;
+        return (
+          <button
+            className={isActive ? "active" : ""}
+            aria-current={isActive ? "page" : undefined}
+            onClick={() => {
+              onNavigate(path);
+              onClose();
+            }}
+            key={id}
+            style={{ position: "relative" }}
+          >
+            {isActive ? <span aria-hidden="true" style={ACTIVE_ACCENT_STYLE} /> : null}
+            <Icon size={18} />
+            <span>{label}</span>
+          </button>
+        );
+      })}
     </>
   );
 
@@ -52,8 +67,8 @@ export function AppSidebar({ page, onNavigate, open, onClose }) {
           </button>
         </div>
         <nav>
-          {renderGroup("workspace", "WORKSPACE")}
-          {renderGroup("admin", "ADMINISTRATION")}
+          {renderGroup("workspace")}
+          {renderGroup("data")}
         </nav>
         <div className="organization">
           <Building2 size={20} />

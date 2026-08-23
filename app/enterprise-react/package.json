@@ -7,13 +7,18 @@
     "dev": "vite",
     "build": "vite build",
     "test:contracts": "node ../../tests/frontend/contracts.test.mjs",
+    "test:agent": "node --experimental-strip-types --test ../../tests/frontend/agentTrace.test.mjs ../../tests/frontend/reportBridge.test.mjs ../../tests/frontend/agents.test.mjs ../../tests/frontend/agentRuntimeAdapter.test.mjs",
+    "test": "node --experimental-strip-types --test ../../tests/frontend/contracts.test.mjs ../../tests/frontend/agentTrace.test.mjs ../../tests/frontend/reportBridge.test.mjs ../../tests/frontend/agents.test.mjs ../../tests/frontend/agentRuntimeAdapter.test.mjs ../../tests/frontend/datahubCatalog.test.mjs ../../tests/frontend/uiPolish.test.mjs ../../tests/frontend/chatPolish.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@assistant-ui/react": "^0.15.16",
+    "@tailwindcss/vite": "^4.3.3",
     "lucide-react": "1.25.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "recharts": "3.10.0"
+    "recharts": "3.10.0",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "6.0.3",

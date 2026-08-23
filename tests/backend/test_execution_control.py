@@ -60,9 +60,9 @@ class ExecutionControlTest(unittest.TestCase):
         self.assertEqual(1, self.adapter.execute_count)
         self.assertTrue(second.data.result.evidence.cached)
         self.assertIn("plan_cache=hit", second.data.trace[4].detail)
-        self.assertIn(PipelineStage.G1, [step.stage for step in second.data.trace])
-        self.assertIn(PipelineStage.G2, [step.stage for step in second.data.trace])
-        self.assertIn(PipelineStage.G3, [step.stage for step in second.data.trace])
+        self.assertIn(PipelineStage.CONTEXT_VALIDATION, [step.stage for step in second.data.trace])
+        self.assertIn(PipelineStage.SQL_VALIDATION, [step.stage for step in second.data.trace])
+        self.assertIn(PipelineStage.RESULT_VERIFICATION, [step.stage for step in second.data.trace])
         self.assertFalse(first.data.result.evidence.cached)
         audit_detail = second.data.trace[1].detail
         self.assertTrue(audit_detail.startswith("audit="))

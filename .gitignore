@@ -80,3 +80,7 @@ chroma/
 *.bin
 models/cache/
 mlruns/
+
+# Local artifacts
+.playwright-mcp/
+*.local

@@ -110,11 +110,11 @@ class AnalysisPipelineTest(unittest.TestCase):
                 PipelineStage.ROUTER,
                 PipelineStage.CONTROLLER,
                 PipelineStage.CONTEXT,
-                PipelineStage.G1,
+                PipelineStage.CONTEXT_VALIDATION,
                 PipelineStage.MODEL,
-                PipelineStage.G2,
+                PipelineStage.SQL_VALIDATION,
                 PipelineStage.QUERY,
-                PipelineStage.G3,
+                PipelineStage.RESULT_VERIFICATION,
                 PipelineStage.ARTIFACT,
             ],
             [step.stage for step in response.data.trace],
@@ -196,7 +196,7 @@ class AnalysisPipelineTest(unittest.TestCase):
         response = self.analyze("clarification")
 
         self.assertEqual(AnalysisStatus.BLOCKED, response.data.status)
-        self.assertEqual(PipelineStage.G1, response.data.trace[-1].stage)
+        self.assertEqual(PipelineStage.CONTEXT_VALIDATION, response.data.trace[-1].stage)
         self.assertEqual(StageOutcome.BLOCKED, response.data.trace[-1].outcome)
         self.assertIsNone(response.data.artifact)
         self.assertEqual(0, self.adapter.execute_count)
@@ -244,7 +244,7 @@ class AnalysisPipelineTest(unittest.TestCase):
         response = self.analyze("g2_blocked")
 
         self.assertEqual(AnalysisStatus.BLOCKED, response.data.status)
-        self.assertEqual(PipelineStage.G2, response.data.trace[-1].stage)
+        self.assertEqual(PipelineStage.SQL_VALIDATION, response.data.trace[-1].stage)
         self.assertEqual(0, response.data.repair_count)
         self.assertEqual(0, self.adapter.execute_count)
 
@@ -295,7 +295,7 @@ class AnalysisPipelineTest(unittest.TestCase):
     def test_query_failure_and_g3_failure_never_create_artifact(self) -> None:
         for scenario, last_stage in (
             ("query_failed", PipelineStage.QUERY),
-            ("g3_failed", PipelineStage.G3),
+            ("g3_failed", PipelineStage.RESULT_VERIFICATION),
         ):
             with self.subTest(scenario=scenario):
                 response = self.analyze(scenario)

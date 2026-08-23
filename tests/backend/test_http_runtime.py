@@ -386,9 +386,9 @@ class RealTemplateHttpRuntimeTest(FastApiRuntimeTest):
         self.assertEqual(200, status)
         self.assertEqual("SUCCEEDED", positive["data"]["status"])
         stages = [step["stage"] for step in positive["data"]["trace"]]
-        self.assertLess(stages.index("G1"), stages.index("G2"))
-        self.assertLess(stages.index("G2"), stages.index("QUERY"))
-        self.assertLess(stages.index("QUERY"), stages.index("G3"))
+        self.assertLess(stages.index("CONTEXT_VALIDATION"), stages.index("SQL_VALIDATION"))
+        self.assertLess(stages.index("SQL_VALIDATION"), stages.index("QUERY"))
+        self.assertLess(stages.index("QUERY"), stages.index("RESULT_VERIFICATION"))
         self.assertEqual("real-query-positive", positive["data"]["artifact"]["query_id"])
         self.assertIsNotNone(positive["data"]["artifact"]["artifact_id"])
 

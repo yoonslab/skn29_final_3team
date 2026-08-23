@@ -1,0 +1,7 @@
+/* Additive Tailwind layers for the assistant-ui chat zone only.
+ * We deliberately avoid importing the full `tailwindcss` entry because the
+ * global stylesheet uses an opinionated enterprise design system and a
+ * preflight reset would clobber it.
+ */
+@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/utilities" layer(utilities);

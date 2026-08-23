@@ -86,7 +86,7 @@
       {
         "detail": null,
         "outcome": "PASSED",
-        "stage": "G1"
+        "stage": "CONTEXT_VALIDATION"
       },
       {
         "detail": null,
@@ -96,7 +96,7 @@
       {
         "detail": null,
         "outcome": "PASSED",
-        "stage": "G2"
+        "stage": "SQL_VALIDATION"
       },
       {
         "detail": null,
@@ -106,7 +106,7 @@
       {
         "detail": null,
         "outcome": "PASSED",
-        "stage": "G3"
+        "stage": "RESULT_VERIFICATION"
       },
       {
         "detail": null,

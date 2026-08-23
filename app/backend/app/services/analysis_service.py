@@ -27,7 +27,7 @@ from app.services.state_machine import AnalysisStateMachine
 
 
 class AnalysisService:
-    """R4가 소유하는 결정론적 Gate·query·Artifact 제어 흐름."""
+    """R4가 소유하는 결정론적 검증·query·Artifact 제어 흐름."""
 
     def __init__(
         self,
@@ -75,20 +75,20 @@ class AnalysisService:
         self._responses.record(trace, PipelineStage.CONTEXT, package.package_hash)
 
         scenario = str(payload.parameters.get("scenario") or "")
-        g1_error = self._support.g1_error(scenario)
-        if g1_error:
-            error_code, message = g1_error
+        context_validation_error = self._support.g1_error(scenario)
+        if context_validation_error:
+            error_code, message = context_validation_error
             return self._responses.error(
                 context,
                 machine,
                 trace,
-                PipelineStage.G1,
+                PipelineStage.CONTEXT_VALIDATION,
                 AnalysisStatus.BLOCKED,
                 error_code,
                 message,
                 decision,
             )
-        self._responses.record(trace, PipelineStage.G1)
+        self._responses.record(trace, PipelineStage.CONTEXT_VALIDATION)
 
         references = [
             {"urn": item.urn, "fqn": item.fqn, "columns": list(item.columns)}
@@ -167,7 +167,7 @@ class AnalysisService:
                 context,
                 machine,
                 trace,
-                PipelineStage.G2,
+                PipelineStage.SQL_VALIDATION,
                 AnalysisStatus.BLOCKED,
                 ErrorCode.SQL_POLICY_BLOCKED,
                 "조회 전용 SQL만 허용합니다.",
@@ -176,7 +176,7 @@ class AnalysisService:
         if violation:
             self._responses.record(
                 trace,
-                PipelineStage.G2,
+                PipelineStage.SQL_VALIDATION,
                 violation,
                 StageOutcome.BLOCKED,
             )
@@ -213,14 +213,14 @@ class AnalysisService:
                     context,
                     machine,
                     trace,
-                    PipelineStage.G2,
+                    PipelineStage.SQL_VALIDATION,
                     AnalysisStatus.BLOCKED,
                     ErrorCode.SQL_POLICY_BLOCKED,
                     "SQL repair 1회 후에도 정책 검증을 통과하지 못했습니다.",
                     decision,
                     repair_count,
                 )
-        self._responses.record(trace, PipelineStage.G2)
+        self._responses.record(trace, PipelineStage.SQL_VALIDATION)
 
         self._cache.put_plan(plan_key, plan)
         gate_token = self._support.gate_token(package, str(plan["sql"]))
@@ -326,20 +326,20 @@ class AnalysisService:
                 retryable=True,
             )
 
-        g3_violation = self._support.g3_violation(query)
-        if g3_violation:
+        result_verification_violation = self._support.g3_violation(query)
+        if result_verification_violation:
             return self._responses.error(
                 context,
                 machine,
                 trace,
-                PipelineStage.G3,
+                PipelineStage.RESULT_VERIFICATION,
                 AnalysisStatus.FAILED,
                 ErrorCode.RESULT_EVIDENCE_MISSING,
                 "근거 또는 결과 범위가 유효하지 않아 Artifact를 생성하지 않았습니다.",
                 decision,
                 repair_count,
             )
-        self._responses.record(trace, PipelineStage.G3)
+        self._responses.record(trace, PipelineStage.RESULT_VERIFICATION)
         if not result_cached:
             self._cache.put_result(result_key, query)
 

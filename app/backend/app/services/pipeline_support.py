@@ -24,7 +24,7 @@ from app.services.context_builder import (
 
 
 class PipelineSupport:
-    """Context, G2, 식별자 생성처럼 상태 전이와 무관한 순수 보조 로직."""
+    """Context, SQL 안전성 검증, 식별자 생성처럼 상태 전이와 무관한 순수 보조 로직."""
 
     MAX_QUERY_ROWS = 1_000
     MAX_RESULT_ROWS = 100

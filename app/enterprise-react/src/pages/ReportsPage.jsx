@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle, ArrowLeft, Ban, BarChart3, Check, ChevronRight, CircleCheck,
   CircleX, Clock3, Columns2, Download, FileOutput, FilePlus2, GripVertical,
@@ -7,6 +7,30 @@ import {
 } from "lucide-react";
 import { SYNTHETIC_META } from "../data/enterpriseDemoData";
 import { normalizeDraftLayout, serializeDraftLayout } from "../contracts/report";
+import { formatRelativeTime } from "../lib/relativeTime.js";
+import "../styles.reports.css";
+
+const RUN_STATUS_TONE = Object.freeze({
+  queued: "rp-status-pill--draft",
+  running: "rp-status-pill--running",
+  success: "rp-status-pill--approved",
+  partial: "rp-status-pill--partial",
+  failed: "rp-status-pill--failed",
+  cancelled: "rp-status-pill--draft",
+});
+
+const RUN_STATUS_LABEL = Object.freeze({
+  queued: "대기",
+  running: "실행 중",
+  success: "성공",
+  partial: "부분 성공",
+  failed: "실패",
+  cancelled: "취소",
+});
+
+const REPORT_ARTIFACT_STORAGE_KEY = "answervice.report.artifact";
+const LATEST_RUN_BASE_MS = Date.parse("2026-08-23T03:00:00.000Z");
+const MINUTE = 60_000;
 
 const REPORTS = [
   { id: 1, type: "주간", period: "07/21~07/27", status: "초안", author: "박준희", updated: "10분 전 수정" },
@@ -17,12 +41,12 @@ const REPORTS = [
 ];
 
 const RUN_HISTORY = [
-  { id: "run-queued", status: "queued", label: "대기", icon: Clock3, summary: "실행 순서를 기다리는 fixture입니다.", blocks: [["객실 매출", "대기"], ["회원 분석", "대기"]] },
-  { id: "run-running", status: "running", label: "실행 중", icon: LoaderCircle, summary: "로컬 상태 전환을 확인하는 fixture입니다.", blocks: [["객실 매출", "완료"], ["회원 분석", "실행 중"]] },
-  { id: "run-success", status: "success", label: "성공", icon: CircleCheck, summary: "모든 블록이 성공한 표시 예시이며 실제 실행 결과가 아닙니다.", blocks: [["객실 매출", "성공"], ["회원 분석", "성공"]] },
-  { id: "run-partial", status: "partial", label: "부분 성공", icon: AlertTriangle, summary: "성공·부분 성공·실패 블록을 함께 표시합니다.", blocks: [["객실 매출", "성공"], ["회원 분석", "부분 성공"], ["연회 분석", "실패"]] },
-  { id: "run-failed", status: "failed", label: "실패", icon: CircleX, summary: "오류 원인을 표시하되 정상 결과로 승격하지 않습니다.", blocks: [["객실 매출", "실패"], ["회원 분석", "취소"]] },
-  { id: "run-cancelled", status: "cancelled", label: "취소", icon: Ban, summary: "취소된 fixture이며 보고서 결과를 만들지 않습니다.", blocks: [["객실 매출", "취소"], ["회원 분석", "취소"]] },
+  { id: "run-queued", status: "queued", label: "대기", icon: Clock3, summary: "실행 순서를 기다리는 fixture입니다.", blocks: [["객실 매출", "대기"], ["회원 분석", "대기"]], timestamp: new Date(LATEST_RUN_BASE_MS - 18 * MINUTE).toISOString() },
+  { id: "run-running", status: "running", label: "실행 중", icon: LoaderCircle, summary: "로컬 상태 전환을 확인하는 fixture입니다.", blocks: [["객실 매출", "완료"], ["회원 분석", "실행 중"]], timestamp: new Date(LATEST_RUN_BASE_MS - 42 * MINUTE).toISOString() },
+  { id: "run-success", status: "success", label: "성공", icon: CircleCheck, summary: "모든 블록이 성공한 표시 예시이며 실제 실행 결과가 아닙니다.", blocks: [["객실 매출", "성공"], ["회원 분석", "성공"]], timestamp: new Date(LATEST_RUN_BASE_MS - 4 * MINUTE).toISOString() },
+  { id: "run-partial", status: "partial", label: "부분 성공", icon: AlertTriangle, summary: "성공·부분 성공·실패 블록을 함께 표시합니다.", blocks: [["객실 매출", "성공"], ["회원 분석", "부분 성공"], ["연회 분석", "실패"]], timestamp: new Date(LATEST_RUN_BASE_MS - 120 * MINUTE).toISOString() },
+  { id: "run-failed", status: "failed", label: "실패", icon: CircleX, summary: "오류 원인을 표시하되 정상 결과로 승격하지 않습니다.", blocks: [["객실 매출", "실패"], ["회원 분석", "취소"]], timestamp: new Date(LATEST_RUN_BASE_MS - 60 * MINUTE).toISOString() },
+  { id: "run-cancelled", status: "cancelled", label: "취소", icon: Ban, summary: "취소된 fixture이며 보고서 결과를 만들지 않습니다.", blocks: [["객실 매출", "취소"], ["회원 분석", "취소"]], timestamp: new Date(LATEST_RUN_BASE_MS - 240 * MINUTE).toISOString() },
 ];
 
 const VIEW_STATE_EXAMPLES = [
@@ -136,6 +160,18 @@ function savedReports() {
   }
 }
 
+function readDraftArtifactFlag() {
+  if (typeof window === "undefined" || !window.sessionStorage) return false;
+  try {
+    const raw = window.sessionStorage.getItem(REPORT_ARTIFACT_STORAGE_KEY);
+    if (!raw) return false;
+    const candidate = JSON.parse(raw);
+    return Boolean(candidate && candidate.artifactId);
+  } catch {
+    return false;
+  }
+}
+
 function Toast({ message }) {
   return message ? <div className="enterprise-toast" role="status" aria-live="polite"><Check size={14} />{message}</div> : null;
 }
@@ -154,12 +190,33 @@ function RunHistoryFixture() {
     if (selectedRun) detailRef.current?.focus();
   }, [selectedRun]);
 
+  const latestRun = useMemo(() => {
+    return RUN_HISTORY.reduce((acc, run) => (
+      !acc || Date.parse(run.timestamp) > Date.parse(acc.timestamp) ? run : acc
+    ), null);
+  }, []);
+  const latestRelative = latestRun ? formatRelativeTime(new Date().toISOString(), latestRun.timestamp) : "";
+
   return <section className="card report-run-fixture" aria-labelledby="run-history-title">
     <header><div><span className="fixture-badge">LOCAL SYNTHETIC FIXTURE</span><h2 id="run-history-title">Run History 상태·접근성 점검</h2><p>아래 항목은 실제 API·스케줄·승인·공유·내보내기 결과가 아닌 화면 검증용 데이터입니다.</p></div><button disabled><Ban size={14} />실제 실행 연결 대기</button></header>
+    {latestRun ? (
+      <div className="rp-latest-run" aria-label="최근 실행 시각">
+        <span className="rp-latest-run__label">최근 실행</span>
+        <span className={`rp-status-pill ${RUN_STATUS_TONE[latestRun.status]}`}>
+          <i aria-hidden="true" />{RUN_STATUS_LABEL[latestRun.status] ?? latestRun.status}
+        </span>
+        <span className="rp-latest-run__time" aria-label={`${latestRun.label} 실행 ${latestRelative}`}>{latestRelative}</span>
+        <span aria-hidden="true">·</span>
+        <span>{latestRun.label}</span>
+      </div>
+    ) : (
+      <p className="rp-latest-run__empty">표시할 실행 이력이 없습니다.</p>
+    )}
     <div className="report-run-layout">
       <nav className="report-run-list" aria-label="fixture 실행 이력">{RUN_HISTORY.map((run) => {
         const Icon = run.icon;
-        return <button type="button" aria-pressed={selectedRunId === run.id} aria-label={`${run.label} fixture 상세 보기`} onClick={() => selectRun(run.id)} key={run.id}><Icon size={17} aria-hidden="true" /><span><b>{run.label}</b><small>{run.status}</small></span><ChevronRight size={14} aria-hidden="true" /></button>;
+        const tone = RUN_STATUS_TONE[run.status] ?? "rp-status-pill--draft";
+        return <button type="button" aria-pressed={selectedRunId === run.id} aria-label={`${run.label} fixture 상세 보기`} onClick={() => selectRun(run.id)} key={run.id}><Icon size={17} aria-hidden="true" /><span><b>{run.label}</b><small><span className={`rp-status-pill ${tone}`}><i aria-hidden="true" />{RUN_STATUS_LABEL[run.status] ?? run.status}</span></small></span><ChevronRight size={14} aria-hidden="true" /></button>;
       })}</nav>
       <section className="report-run-detail" ref={detailRef} tabIndex={-1} role="status" aria-live="polite" aria-atomic="true">
         {selectedRun ? <><header><SelectedIcon size={19} aria-hidden="true" /><div><small>{selectedRun.id}</small><h3>{selectedRun.label}</h3></div></header><p>{selectedRun.summary}</p><ul>{selectedRun.blocks.map(([name, status]) => <li key={name}><span>{name}</span><b>{status}</b></li>)}</ul><button disabled>{["queued", "running"].includes(selectedRun.status) ? "fixture 처리 중 · 조작 불가" : "실제 작업 연결 대기"}</button></> : <div className="report-run-placeholder"><Info size={20} aria-hidden="true" /><p>실행 상태를 선택하면 상세와 블록별 상태가 여기에 표시됩니다.</p></div>}
@@ -189,6 +246,7 @@ export function ReportsPage() {
   const [editorBlocks, setEditorBlocks] = useState(initialEditorBlocks);
   const [draggedBlockId, setDraggedBlockId] = useState(null);
   const [draggedLibraryItem, setDraggedLibraryItem] = useState(null);
+  const [hasDraftArtifact, setHasDraftArtifact] = useState(() => readDraftArtifactFlag());
   const notify = (message) => { setToast(message); window.setTimeout(() => setToast(""), 1800); };
   const filteredReports = reports.filter((report) => {
     const query = reportSearch.trim().toLowerCase();
@@ -224,6 +282,18 @@ export function ReportsPage() {
   useEffect(() => {
     window.localStorage.setItem("answervice.reports", JSON.stringify(reports));
   }, [reports]);
+
+  useEffect(() => {
+    if (view !== "list") return;
+    setHasDraftArtifact(readDraftArtifactFlag());
+    const handleStorage = (event) => {
+      if (event.key === REPORT_ARTIFACT_STORAGE_KEY) {
+        setHasDraftArtifact(readDraftArtifactFlag());
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [view]);
   const createBlock = (item) => toLayoutBlock({ ...item, id: `${item.key || item.type}-${Date.now()}-${Math.random().toString(16).slice(2)}` });
   const addBlock = (item) => {
     const block = createBlock(item);
@@ -278,9 +348,28 @@ export function ReportsPage() {
 
   if (view === "list") return <div className="page-content enterprise-reports-list">
     <div className="meta-strip"><Info size={13} />{SYNTHETIC_META.label}<span>seed {SYNTHETIC_META.seed}</span><span>schema {SYNTHETIC_META.schemaVersion}</span></div>
-    <div className="legacy-report-toolbar"><button className="primary" onClick={createAutomatedReport}><FilePlus2 size={15} />로컬 보고서 예시 생성</button><label className="report-search">검색<input aria-label="보고서 검색" value={reportSearch} onChange={(event) => setReportSearch(event.target.value)} placeholder="기간, 작성자, 상태 검색" /></label><label>유형<select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>전체</option><option>주간</option><option>월간</option><option>분기</option></select></label><label>상태<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>전체</option><option>초안</option><option>확정</option></select></label></div>
+    <div className="rp-toolbar">
+      <button
+        type="button"
+        className="rp-cta"
+        onClick={createAutomatedReport}
+        disabled={!hasDraftArtifact}
+        title={hasDraftArtifact ? "분석 챗의 결과를 새 보고서로 복사합니다." : "분석 결과를 먼저 보고서에 담아주세요"}
+      >
+        <FilePlus2 size={15} />새 보고서 작성
+      </button>
+      <span className="rp-toolbar__spacer" />
+      <label className="report-search">검색<input aria-label="보고서 검색" value={reportSearch} onChange={(event) => setReportSearch(event.target.value)} placeholder="기간, 작성자, 상태 검색" /></label><label>유형<select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>전체</option><option>주간</option><option>월간</option><option>분기</option></select></label><label>상태<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>전체</option><option>초안</option><option>확정</option></select></label>
+    </div>
     <RunHistoryFixture />
-    <section className="card legacy-report-list"><div className="legacy-report-row legacy-report-head"><span>유형</span><span>기간</span><span>상태</span><span>작성자</span><span>최근 변경</span><span>동작</span></div>{filteredReports.map((report) => <article className="legacy-report-row" key={report.id}><strong>{report.type}</strong><b>{report.period}</b><span><i className={`legacy-report-status ${report.status === "초안" ? "draft" : "final"}`}><em />{report.status}</i></span><span>{report.author}</span><span>{report.updated}</span><button onClick={() => openReport(report)}>{report.status === "초안" ? "편집" : "열람"} <ChevronRight size={13} /></button></article>)}</section>
+    {filteredReports.length === 0 ? (
+      <div className="rp-empty" role="status">
+        <b>아직 보고서가 없습니다</b>
+        분석 챗에서 결과를 보고서에 담으면 여기에 표시됩니다.
+      </div>
+    ) : (
+      <section className="card legacy-report-list"><div className="legacy-report-row legacy-report-head"><span>유형</span><span>기간</span><span>상태</span><span>작성자</span><span>최근 변경</span><span>동작</span></div>{filteredReports.map((report) => <article className="legacy-report-row" key={report.id}><strong>{report.type}</strong><b>{report.period}</b><span><i className={`legacy-report-status ${report.status === "초안" ? "draft" : "final"}`}><em />{report.status}</i></span><span>{report.author}</span><span>{report.updated}</span><button onClick={() => openReport(report)}>{report.status === "초안" ? "편집" : "열람"} <ChevronRight size={13} /></button></article>)}</section>
+    )}
     <p className="legacy-report-guide">목록의 상태도 local fixture이며 실제 승인 이력이 아닙니다. 각 보고서는 동작 버튼으로 열 수 있습니다.</p>
   </div>;
 

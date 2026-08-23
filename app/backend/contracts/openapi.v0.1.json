@@ -623,12 +623,12 @@
           "ROUTER",
           "CONTROLLER",
           "CONTEXT",
-          "G1",
+          "CONTEXT_VALIDATION",
           "MODEL",
-          "G2",
+          "SQL_VALIDATION",
           "REPAIR",
           "QUERY",
-          "G3",
+          "RESULT_VERIFICATION",
           "ARTIFACT"
         ],
         "title": "PipelineStage",
@@ -1066,7 +1066,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G1"
+                            "stage": "CONTEXT_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1074,7 +1074,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G2"
+                            "stage": "SQL_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1082,7 +1082,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G3"
+                            "stage": "RESULT_VERIFICATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1130,7 +1130,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G1"
+                            "stage": "CONTEXT_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1138,7 +1138,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G2"
+                            "stage": "SQL_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1146,7 +1146,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G3"
+                            "stage": "RESULT_VERIFICATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1257,7 +1257,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G1"
+                            "stage": "CONTEXT_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1265,7 +1265,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G2"
+                            "stage": "SQL_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1273,7 +1273,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G3"
+                            "stage": "RESULT_VERIFICATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1321,7 +1321,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G1"
+                            "stage": "CONTEXT_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1329,7 +1329,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G2"
+                            "stage": "SQL_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1337,7 +1337,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G3"
+                            "stage": "RESULT_VERIFICATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1389,7 +1389,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G1"
+                            "stage": "CONTEXT_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1397,7 +1397,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G2"
+                            "stage": "SQL_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1405,7 +1405,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G3"
+                            "stage": "RESULT_VERIFICATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1458,7 +1458,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G1"
+                            "stage": "CONTEXT_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1466,7 +1466,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G2"
+                            "stage": "SQL_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1474,7 +1474,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G3"
+                            "stage": "RESULT_VERIFICATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1585,7 +1585,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G1"
+                            "stage": "CONTEXT_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1593,7 +1593,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G2"
+                            "stage": "SQL_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1601,7 +1601,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G3"
+                            "stage": "RESULT_VERIFICATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1717,7 +1717,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G1"
+                            "stage": "CONTEXT_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1725,7 +1725,7 @@
                           },
                           {
                             "outcome": "BLOCKED",
-                            "stage": "G2"
+                            "stage": "SQL_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1733,7 +1733,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G2"
+                            "stage": "SQL_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1741,7 +1741,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G3"
+                            "stage": "RESULT_VERIFICATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1852,7 +1852,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G1"
+                            "stage": "CONTEXT_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1860,7 +1860,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G2"
+                            "stage": "SQL_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1868,7 +1868,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G3"
+                            "stage": "RESULT_VERIFICATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1916,7 +1916,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G1"
+                            "stage": "CONTEXT_VALIDATION"
                           },
                           {
                             "outcome": "PASSED",
@@ -1924,7 +1924,7 @@
                           },
                           {
                             "outcome": "PASSED",
-                            "stage": "G2"
+                            "stage": "SQL_VALIDATION"
                           },
                           {
                             "outcome": "FAILED",
