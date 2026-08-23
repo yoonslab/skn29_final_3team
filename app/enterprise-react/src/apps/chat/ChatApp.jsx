@@ -12,6 +12,7 @@ import {
   buildRunFromResultEvent,
 } from "../../lib/agentTrace.js";
 import { SSE_ERROR_FALLBACK, openAgentStream } from "../../api/sseClient.js";
+import { buildFollowups } from "../../lib/followups.js";
 import { analysisFixtures } from "../../data/analysisFixtures.ts";
 import {
   appendAssistantMessage,
@@ -378,21 +379,30 @@ export function ChatApp() {
         ) : (
           <div className="thread-scroll" ref={scrollRef} onScroll={handleScroll}>
             <div className="thread-inner">
-              {active.messages.map((m) =>
-                m.role === "user" ? (
-                  <div key={m.id} className="turn-user-group">
-                    <div className="turn-user">{m.text}</div>
-                    <div className="turn-user__actions">
-                      <button onClick={() => beginEdit(m.id)}>편집</button>
-                      <button onClick={() => navigator.clipboard?.writeText(m.text)}>복사</button>
-                    </div>
-                  </div>
-                ) : (
-                  <AssistantTurn key={m.id} message={m}
-                    onOpenArtifact={() => setArtifactOpen(true)}
-                    onRegenerate={m.id === lastAssistant ? regenerate : undefined} />
-                ),
-              )}
+              {(() => {
+                let lastUserText = "";
+                return active.messages.map((m) => {
+                  if (m.role === "user") {
+                    lastUserText = m.text;
+                    return (
+                      <div key={m.id} className="turn-user-group">
+                        <div className="turn-user">{m.text}</div>
+                        <div className="turn-user__actions">
+                          <button onClick={() => beginEdit(m.id)}>편집</button>
+                          <button onClick={() => navigator.clipboard?.writeText(m.text)}>복사</button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  const isLast = m.id === lastAssistant;
+                  return (
+                    <AssistantTurn key={m.id} message={{ ...m, question: lastUserText }}
+                      onOpenArtifact={() => setArtifactOpen(true)}
+                      onRegenerate={isLast ? regenerate : undefined}
+                      onAsk={isLast ? send : undefined} />
+                  );
+                });
+              })()}
               <div ref={bottomRef} />
             </div>
           </div>
@@ -454,7 +464,7 @@ function EmptyState({ onPick }) {
   );
 }
 
-function AssistantTurn({ message, onOpenArtifact, onRegenerate }) {
+function AssistantTurn({ message, onOpenArtifact, onRegenerate, onAsk }) {
   const [openSteps, setOpenSteps] = useState(message.streaming);
   const [copied, setCopied] = useState(false);
   useEffect(() => {
@@ -512,6 +522,10 @@ function AssistantTurn({ message, onOpenArtifact, onRegenerate }) {
       {message.result && <ResultBlock run={message.result} />}
 
       {!message.streaming && (
+        <FollowUps question={message.question} run={message.result} onAsk={onAsk} />
+      )}
+
+      {!message.streaming && (
         <div className="msg-actions">
           {message.reportReady && <button type="button" onClick={onOpenArtifact}>리포트로 정리</button>}
           {message.body && (
@@ -524,6 +538,22 @@ function AssistantTurn({ message, onOpenArtifact, onRegenerate }) {
           {onRegenerate && !message.error && <button type="button" onClick={onRegenerate}>다시 생성</button>}
         </div>
       )}
+    </div>
+  );
+}
+
+function FollowUps({ question, run, onAsk }) {
+  if (!onAsk || !run) return null;
+  const items = useMemo(() => buildFollowups(question, run), [question, run]);
+  if (!items.length) return null;
+  return (
+    <div className="followups" role="list" aria-label="관련 질문">
+      <small>이어서 물어보기</small>
+      <div>
+        {items.map((q) => (
+          <button key={q} type="button" role="listitem" onClick={() => onAsk(q)}>{q}</button>
+        ))}
+      </div>
     </div>
   );
 }

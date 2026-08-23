@@ -1,0 +1,8 @@
+
+/* ── Iteration 3: 관련 질문(Perplexity식) ──── */
+.followups{display:flex;flex-direction:column;gap:6px}
+.followups>small{color:var(--c-ink-3);font-size:11px;font-weight:600;letter-spacing:.05em}
+.followups>div{display:flex;flex-wrap:wrap;gap:6px}
+.followups button{padding:7px 12px;border:1px solid var(--c-line);border-radius:var(--radius-full);
+  background:#fff;color:var(--c-ink-2);font-size:12.5px;text-align:left;cursor:pointer}
+.followups button:hover{background:var(--c-rail);border-color:#d9d8d2;color:var(--c-ink)}

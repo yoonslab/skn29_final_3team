@@ -8,7 +8,7 @@
     "build": "vite build",
     "test:contracts": "node ../../tests/frontend/contracts.test.mjs",
     "test:agent": "node --experimental-strip-types --test ../../tests/frontend/agentTrace.test.mjs ../../tests/frontend/reportBridge.test.mjs ../../tests/frontend/agents.test.mjs ../../tests/frontend/agentRuntimeAdapter.test.mjs",
-    "test": "node --experimental-strip-types --test ../../tests/frontend/contracts.test.mjs ../../tests/frontend/agentTrace.test.mjs ../../tests/frontend/reportBridge.test.mjs ../../tests/frontend/agents.test.mjs ../../tests/frontend/agentRuntimeAdapter.test.mjs ../../tests/frontend/datahubCatalog.test.mjs ../../tests/frontend/uiPolish.test.mjs ../../tests/frontend/chatPolish.test.mjs",
+    "test": "node --experimental-strip-types --test ../../tests/frontend/contracts.test.mjs ../../tests/frontend/agentTrace.test.mjs ../../tests/frontend/reportBridge.test.mjs ../../tests/frontend/agents.test.mjs ../../tests/frontend/agentRuntimeAdapter.test.mjs ../../tests/frontend/datahubCatalog.test.mjs ../../tests/frontend/uiPolish.test.mjs ../../tests/frontend/chatPolish.test.mjs ../../tests/frontend/followups.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
