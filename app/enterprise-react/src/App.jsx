@@ -4,6 +4,7 @@ import { AppSidebar } from "./components/layout/AppSidebar";
 import { PAGE_PATHS, resolveRoute } from "./routing";
 
 const AgentPage = lazy(() => import("./pages/AgentPage").then((module) => ({ default: module.AgentPage })));
+const ChatApp = lazy(() => import("./apps/chat/ChatApp.jsx").then((module) => ({ default: module.ChatApp })));
 const ReportsPage = lazy(() => import("./pages/ReportsPage").then((module) => ({ default: module.ReportsPage })));
 const CatalogPage = lazy(() => import("./pages/CatalogPage").then((module) => ({ default: module.CatalogPage })));
 const ConnectionsPage = lazy(() => import("./pages/ConnectionsPage").then((module) => ({ default: module.ConnectionsPage })));
@@ -60,6 +61,7 @@ export function App() {
 
   const content = useMemo(() => {
     if (page === "notFound") return <NotFoundPage onNavigate={navigate} />;
+    if (page === "chat") return <ChatApp />;
     if (page === "reports") return <ReportsPage />;
     if (page === "connections") return <ConnectionsPage />;
     if (page === "catalog") {
@@ -71,6 +73,14 @@ export function App() {
     }
     return <AgentPage />;
   }, [navigate, page]);
+
+  if (page === "chat") {
+    return (
+      <div className={`app-shell ${isPending ? "is-page-pending" : ""}`}>
+        <Suspense fallback={null}>{content}</Suspense>
+      </div>
+    );
+  }
 
   return (
     <div className={`app-shell ${isPending ? "is-page-pending" : ""}`}>

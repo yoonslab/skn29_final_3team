@@ -1,0 +1,148 @@
+/* ============================================================
+   ANSWERVICE theme v2 — AI-native canvas (Claude/NotebookLM 계열)
+   기존 styles.css와 독립. .chat-app 스코프 + 최소 글로벌만 정의.
+   ============================================================ */
+
+:root{
+  --c-canvas:#ffffff;
+  --c-rail:#f7f7f4;
+  --c-hover:#efefec;
+  --c-bubble:#f1f0eb;
+  --c-line:#e8e7e2;
+  --c-ink:#17170f;
+  --c-ink-2:#5d5b52;
+  --c-ink-3:#8f8d84;
+  --c-accent:#c96442;
+  --c-ok:#1f7a43;
+  --c-warn:#a05a03;
+  --c-danger:#b3402f;
+  --radius-xl:16px;--radius-lg:12px;--radius-md:10px;--radius-full:999px;
+  --sh-composer:0 2px 14px rgba(23,23,15,.06);
+}
+
+html,body{height:100%}
+body{margin:0;background:var(--c-canvas);color:var(--c-ink);
+  font-family:"Inter",-apple-system,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+
+.chat-app{display:grid;grid-template-columns:264px minmax(0,1fr);height:100vh;background:var(--c-canvas)}
+.chat-app--artifact{grid-template-columns:264px minmax(0,1fr) minmax(360px,34%)}
+
+/* ── 좌측 레일 ─────────────────────────────── */
+.rail{display:flex;flex-direction:column;background:var(--c-rail);border-right:1px solid var(--c-line);min-width:0}
+.rail__top{padding:12px}
+.rail__brand{display:flex;align-items:center;gap:9px;padding:6px 8px 14px;font-weight:600;letter-spacing:.02em}
+.rail__brand-mark{width:26px;height:26px;display:grid;place-items:center;border-radius:8px;background:var(--c-ink);color:#fff;font-size:11px;font-weight:700}
+.btn-newchat{width:100%;height:38px;display:flex;align-items:center;gap:8px;padding:0 12px;border:0;border-radius:var(--radius-md);
+  background:transparent;color:var(--c-ink);font-size:14px;font-weight:500;cursor:pointer}
+.btn-newchat:hover{background:var(--c-hover)}
+.rail__search{width:100%;height:36px;margin-bottom:10px;padding:0 12px;border:1px solid transparent;border-radius:var(--radius-md);background:transparent;color:var(--c-ink);font-size:13.5px;outline:none}
+.rail__search:hover{background:var(--c-hover)}
+.rail__search:focus{background:#fff;border-color:var(--c-line)}
+.rail__label{margin:14px 10px 6px;font-size:11px;font-weight:600;color:var(--c-ink-3);letter-spacing:.06em}
+.rail__list{flex:1;overflow-y:auto;padding:0 8px 12px;display:flex;flex-direction:column;gap:2px}
+.conv-item{width:100%;padding:8px 10px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--c-ink-2);
+  display:flex;flex-direction:column;gap:2px;text-align:left;cursor:pointer;font-size:13.5px}
+.conv-item:hover{background:var(--c-hover)}
+.conv-item[aria-current="true"]{background:var(--c-bubble);color:var(--c-ink);font-weight:500}
+.conv-item__title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conv-item__meta{font-size:11.5px;color:var(--c-ink-3)}
+.rail__foot{padding:12px;border-top:1px solid var(--c-line);display:flex;align-items:center;gap:10px}
+.rail__org-badge{width:30px;height:30px;display:grid;place-items:center;border-radius:50%;background:var(--c-ink);color:#fff;font-size:12px;font-weight:600}
+.rail__org b{display:block;font-size:12.5px;line-height:1.3}
+.rail__org small{font-size:11px;color:var(--c-ink-3)}
+
+/* ── 중앙 스레드 ──────────────────────────── */
+.thread-pane{position:relative;display:flex;flex-direction:column;min-width:0;height:100vh}
+.thread-scroll{flex:1;overflow-y:auto;scroll-padding-bottom:24px}
+.thread-inner{max-width:46rem;margin:0 auto;padding:32px 24px 24px;display:flex;flex-direction:column;gap:28px}
+
+.turn-user{align-self:flex-end;max-width:78%;padding:11px 16px;border-radius:18px;background:var(--c-bubble);white-space:pre-wrap;word-break:break-word}
+.turn-assistant{display:flex;flex-direction:column;gap:10px}
+.turn-assistant__head{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--c-ink-2)}
+.agent-dot{width:8px;height:8px;border-radius:50%;background:hsl(var(--agent-hue,250) 42% 48%)}
+.turn-assistant__body{white-space:pre-wrap;word-break:break-word}
+.turn-assistant__streaming::after{content:"▍";margin-left:2px;color:var(--c-accent);animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+.verify-chip{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--c-line);
+  border-radius:var(--radius-full);background:transparent;color:var(--c-ok);font-size:12px;font-weight:500;cursor:pointer}
+.verify-chip:hover{background:var(--c-rail)}
+.verify-chip--running{color:var(--c-warn)}
+.verify-steps{margin:0;padding:10px 14px;border:1px solid var(--c-line);border-radius:var(--radius-lg);
+  display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--c-ink-2)}
+.verify-steps li{display:flex;align-items:center;gap:8px;list-style:none}
+.step-dot{width:6px;height:6px;border-radius:50%;background:var(--c-line);flex:none}
+.step-dot--done{background:var(--c-ok)}.step-dot--running{background:var(--c-warn);animation:pulse 1.1s ease infinite}
+.step-dot--blocked,.step-dot--failed{background:var(--c-danger)}
+@keyframes pulse{50%{opacity:.35}}
+
+.result-block{border:1px solid var(--c-line);border-radius:var(--radius-lg);overflow:hidden}
+.result-block__summary{padding:12px 16px;background:#fbfbfa;font-size:14.5px}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--c-line)}
+.kpi{padding:12px 16px;background:#fff}
+.kpi small{display:block;font-size:11px;color:var(--c-ink-3);text-transform:uppercase;letter-spacing:.05em}
+.kpi strong{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:17px;font-weight:600}
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th{text-align:left;padding:8px 16px;background:#fbfbfa;color:var(--c-ink-3);font-weight:500;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
+.data-table td{padding:8px 16px;border-top:1px solid var(--c-line);font-variant-numeric:tabular-nums}
+
+.msg-actions{display:flex;gap:2px}
+.msg-actions button{height:28px;min-width:28px;display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  padding:0 8px;border:0;border-radius:7px;background:transparent;color:var(--c-ink-3);font-size:12px;cursor:pointer}
+.msg-actions button:hover{background:var(--c-hover);color:var(--c-ink)}
+
+/* 빈 상태 */
+.thread-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;text-align:center}
+.thread-empty h1{margin:0;font-size:24px;font-weight:600;letter-spacing:-.01em}
+.thread-empty>p{margin:0 0 14px;color:var(--c-ink-2);font-size:14px}
+.suggestions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:32rem}
+.suggestion{padding:8px 14px;border:1px solid var(--c-line);border-radius:var(--radius-full);background:transparent;
+  color:var(--c-ink-2);font-size:13px;cursor:pointer}
+.suggestion:hover{background:var(--c-rail);color:var(--c-ink)}
+
+/* ── 컴포저 ───────────────────────────────── */
+.composer-wrap{position:absolute;left:0;right:0;bottom:0;padding:0 24px 18px;
+  background:linear-gradient(180deg,rgba(255,255,255,0),var(--c-canvas) 38%)}
+.composer{max-width:46rem;margin:0 auto;border:1px solid var(--c-line);border-radius:18px;background:#fff;box-shadow:var(--sh-composer)}
+.composer:focus-within{border-color:#cfcecb}
+.composer__chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 0}
+.chip-agent{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border:1px solid var(--c-line);border-radius:var(--radius-full);
+  font-size:12px;color:var(--c-ink-2)}
+.chip-agent button{border:0;background:none;color:var(--c-ink-3);cursor:pointer;font-size:12px;padding:0}
+.composer__row{display:flex;align-items:flex-end;gap:8px;padding:10px 10px 10px 14px}
+.composer textarea{flex:1;max-height:180px;padding:6px 0;border:0;outline:0;resize:none;background:transparent;
+  color:var(--c-ink);font:inherit;font-size:15px;line-height:1.55}
+.composer__send{width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:10px;
+  background:var(--c-ink);color:#fff;cursor:pointer}
+.composer__send:disabled{background:var(--c-line);color:#fff;cursor:not-allowed}
+.composer__hint{max-width:46rem;margin:6px auto 0;text-align:center;font-size:11px;color:var(--c-ink-3)}
+
+.agent-menu{position:absolute;bottom:calc(100% + 8px);left:0;width:260px;padding:6px;
+  border:1px solid var(--c-line);border-radius:var(--radius-lg);background:#fff;box-shadow:var(--sh-composer)}
+.agent-menu__item{width:100%;display:flex;align-items:center;gap:10px;padding:8px 10px;border:0;border-radius:var(--radius-md);
+  background:transparent;text-align:left;cursor:pointer}
+.agent-menu__item:hover,.agent-menu__item[data-active="true"]{background:var(--c-rail)}
+.agent-menu__item b{display:block;font-size:13px;font-weight:550}
+.agent-menu__item small{display:block;font-size:11.5px;color:var(--c-ink-3)}
+
+/* ── 우측 리포트 아티팩트 (NotebookLM식 문서) ─ */
+.artifact-drawer{display:flex;flex-direction:column;min-width:0;height:100vh;border-left:1px solid var(--c-line);background:#fcfcfa}
+.artifact-drawer__head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 20px;border-bottom:1px solid var(--c-line)}
+.artifact-drawer__head small{font-size:11px;font-weight:600;color:var(--c-ink-3);letter-spacing:.08em}
+.artifact-doc{flex:1;overflow-y:auto;padding:28px 30px 40px}
+.doc-title{margin:0 0 4px;font-size:22px;font-weight:650;letter-spacing:-.01em}
+.doc-sub{margin:0 0 18px;color:var(--c-ink-3);font-size:12.5px}
+.doc-source-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:22px}
+.doc-section{margin:0 0 26px}
+.doc-section>h2{margin:0 0 10px;padding-top:18px;border-top:1px solid var(--c-line);font-size:15px;font-weight:600}
+.doc-section p{margin:0;color:#33322c;font-size:14px}
+.doc-cite{vertical-align:super;font-size:10px;color:var(--c-accent);cursor:default}
+.doc-sources ol{margin:8px 0 0;padding-left:18px;font-size:12.5px;color:var(--c-ink-2);display:grid;gap:4px}
+.doc-empty{color:var(--c-ink-3);font-size:13px;padding:40px 0;text-align:center}
+
+@media(max-width:1024px){
+  .chat-app{grid-template-columns:minmax(0,1fr)}
+  .rail{display:none}
+  .chat-app--artifact{grid-template-columns:minmax(0,1fr)}
+}
