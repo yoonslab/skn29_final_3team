@@ -84,3 +84,6 @@ mlruns/
 # Local artifacts
 .playwright-mcp/
 *.local
+
+# Verification screenshots
+*-chat-notebook-report.png
