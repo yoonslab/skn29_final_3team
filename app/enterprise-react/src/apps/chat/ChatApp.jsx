@@ -27,6 +27,12 @@ const ReportArtifact = lazy(() =>
 );
 
 const AGENT_HUES = Object.fromEntries(Object.entries(AGENTS).map(([id, a]) => [id, a.hue ?? 250]));
+const SUGGESTIONS = [
+  "지난주 객실 매출 추이를 보여줘",
+  "이번 달 회원 등급별 분포를 비교해줘",
+  "F&B 시간대별 매출 상위 메뉴는?",
+  "연회 예약 취소 사유 요약해줘",
+];
 
 function relativeTime(iso) {
   const t = Date.parse(iso);
@@ -53,8 +59,13 @@ export function ChatApp() {
   const [mentions, setMentions] = useState([]);
   const [phase, setPhase] = useState("idle");
   const [artifactOpen, setArtifactOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
   const bottomRef = useRef(null);
+  const scrollRef = useRef(null);
+  const stickToBottom = useRef(true);
+  const abortRef = useRef(null);
   const activeIdRef = useRef(activeId);
+
   useEffect(() => {
     activeIdRef.current = active?.id ?? null;
   }, [active?.id]);
@@ -65,12 +76,30 @@ export function ChatApp() {
     } catch {}
   }, [conversations]);
 
+  useEffect(() => {
+    if (stickToBottom.current) bottomRef.current?.scrollIntoView({ block: "end" });
+  }, [active?.messages.length, phase]);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 48;
+    stickToBottom.current = atBottom;
+    el.dataset.showJump = String(!atBottom);
+  };
+
+  const jumpToBottom = () => {
+    stickToBottom.current = true;
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  };
+
   const newChat = useCallback(() => {
     const conv = createConversation();
     setConversations((prev) => [conv, ...prev]);
     setActiveId(conv.id);
     setDraftText("");
     setMentions([]);
+    setEditing(null);
     setArtifactOpen(false);
   }, []);
 
@@ -89,44 +118,27 @@ export function ChatApp() {
     );
   }, []);
 
-  const send = useCallback(
-    async (rawText) => {
-      const question = String(rawText ?? "").trim();
-      if (!question || phase !== "idle") return;
-
-      let base = conversations.find((c) => c.id === activeIdRef.current) ?? null;
-      let isNew = false;
-      if (!base) {
-        base = createConversation();
-        isNew = true;
-      }
-
-      const mentioned = parseMentions(question);
-      const targets = [...new Set(mentioned.length ? mentioned : routeQuestion(question).targets)];
-      const now = new Date().toISOString();
-
-      let working = appendUserMessage(base, question, now);
-      working = appendAssistantMessage(
-        working,
-        { agents: ["coordinator", ...targets.filter((t) => t !== "coordinator")], steps: initialTraceSteps() },
-        now,
-      );
+  const streamTurn = useCallback(
+    async (working, question) => {
       const assistantId = working.messages.at(-1).id;
-
-      setConversations((prev) => (isNew ? [working, ...prev] : prev.map((c) => (c.id === working.id ? working : c))));
-      if (isNew) setActiveId(working.id);
+      setConversations((prev) => {
+        const exists = prev.some((c) => c.id === working.id);
+        return exists
+          ? prev.map((c) => (c.id === working.id ? working : c))
+          : [working, ...prev];
+      });
+      setActiveId(working.id);
       activeIdRef.current = working.id;
-      setDraftText("");
-      setMentions([]);
       setPhase("streaming");
+      stickToBottom.current = true;
 
       let steps = working.messages.at(-1).steps;
       let settled = false;
-      let lastRun = null;
+      abortRef.current = new AbortController();
+      const signal = abortRef.current.signal;
 
       const finishWithRun = (run) => {
         settled = true;
-        lastRun = run;
         steps = AGENT_TRACE_STEPS.map(() => ({ status: "done" }));
         patchActive(assistantId, {
           steps: [...steps],
@@ -161,30 +173,161 @@ export function ChatApp() {
 
       const fixtureWalk = async () => {
         for (let i = 1; i <= AGENT_TRACE_STEPS.length; i += 1) {
+          if (signal.aborted) throw new DOMException("aborted", "AbortError");
           steps = reduceTraceEvent(steps, { type: "trace", step: i, status: "running" });
           patchActive(assistantId, { steps: [...steps] });
-          await sleep(70);
+          await sleep(70, signal);
           steps = reduceTraceEvent(steps, { type: "trace", step: i, status: "done" });
           patchActive(assistantId, { steps: [...steps] });
         }
-        await sleep(100);
+        await sleep(100, signal);
         finishWithRun(analysisFixtures.ready);
       };
 
       try {
-        for await (const frame of openAgentStream({ question, conversationId: working.id, onFrame })) {
+        for await (const frame of openAgentStream({
+          question,
+          conversationId: working.id,
+          signal,
+          onFrame,
+        })) {
           onFrame(frame);
         }
         if (!settled) throw new Error(SSE_ERROR_FALLBACK);
-      } catch {
-        // 백엔드 미기동 환경에서도 동일한 멀티턴 경험을 제공하는 결정론적 폴백
-        await fixtureWalk();
+      } catch (error) {
+        if (signal.aborted || error?.name === "AbortError") {
+          patchActive(assistantId, { streaming: false, stopped: true, steps: [...steps] });
+        } else {
+          try {
+            await fixtureWalk();
+          } catch (inner) {
+            if (inner?.name === "AbortError" || signal.aborted) {
+              patchActive(assistantId, { streaming: false, stopped: true, steps: [...steps] });
+            } else {
+              patchActive(assistantId, {
+                streaming: false,
+                error: "지금은 분석 엔진에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+              });
+            }
+          }
+        }
       } finally {
+        abortRef.current = null;
         setPhase("idle");
       }
     },
-    [activeIdRef, conversations, phase],
+    [patchActive],
   );
+
+  const send = useCallback(
+    (text) => {
+      const question = String(text ?? "").trim();
+      if (!question || phase !== "idle") return;
+
+      let base = conversations.find((c) => c.id === activeIdRef.current) ?? null;
+      let isNew = false;
+      if (!base) {
+        base = createConversation();
+        isNew = true;
+      }
+      const mentioned = parseMentions(question);
+      const targets = [...new Set(mentioned.length ? mentioned : routeQuestion(question).targets)];
+      const now = new Date().toISOString();
+
+      let working = appendUserMessage(base, question, now);
+      working = appendAssistantMessage(
+        working,
+        { agents: ["coordinator", ...targets.filter((t) => t !== "coordinator")], steps: initialTraceSteps() },
+        now,
+      );
+      setDraftText("");
+      setMentions([]);
+      setEditing(null);
+      void streamTurn(working, question);
+    },
+    [conversations, phase, streamTurn],
+  );
+
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
+  const regenerate = useCallback(() => {
+    if (phase !== "idle" || !active) return;
+    const msgs = active.messages;
+    let lastUserIdx = -1;
+    for (let i = msgs.length - 1; i >= 0; i -= 1) {
+      if (msgs[i].role === "user") { lastUserIdx = i; break; }
+    }
+    if (lastUserIdx === -1) return;
+    const question = msgs[lastUserIdx].text;
+    const kept = msgs.slice(0, lastUserIdx + 1);
+    const targets = [...new Set(parseMentions(question).length ? parseMentions(question) : routeQuestion(question).targets)];
+    const now = new Date().toISOString();
+    const working = {
+      ...active,
+      messages: [
+        ...kept,
+        {
+          id: `a_${Math.random().toString(36).slice(2)}`,
+          role: "assistant",
+          agents: ["coordinator", ...targets.filter((t) => t !== "coordinator")],
+          body: "",
+          steps: initialTraceSteps(),
+          result: null,
+          reportReady: false,
+          streaming: true,
+          at: now,
+        },
+      ],
+      updatedAt: now,
+    };
+    void streamTurn(working, question);
+  }, [active, phase, streamTurn]);
+
+  const beginEdit = useCallback(
+    (messageId) => {
+      const msg = active?.messages.find((m) => m.id === messageId);
+      if (!msg || msg.role !== "user" || phase !== "idle") return;
+      setEditing({ messageId });
+      setDraftText(msg.text);
+      setMentions(parseMentions(msg.text));
+    },
+    [active, phase],
+  );
+
+  const cancelEdit = useCallback(() => {
+    setEditing(null);
+    setDraftText("");
+  }, []);
+
+  const submitEdit = useCallback(() => {
+    const newText = draftText.trim();
+    if (!editing || !newText || phase !== "idle" || !active) return;
+    const idx = active.messages.findIndex((m) => m.id === editing.messageId);
+    if (idx === -1) { cancelEdit(); return; }
+    const mentioned = parseMentions(newText);
+    const targets = [...new Set(mentioned.length ? mentioned : routeQuestion(newText).targets)];
+    const now = new Date().toISOString();
+    const working = {
+      ...active,
+      messages: [
+        ...active.messages.slice(0, idx),
+        { id: `m_${Math.random().toString(36).slice(2)}`, role: "user", text: newText, at: now },
+        {
+          id: `a_${Math.random().toString(36).slice(2)}`,
+          role: "assistant",
+          agents: ["coordinator", ...targets.filter((t) => t !== "coordinator")],
+          body: "", steps: initialTraceSteps(), result: null, reportReady: false, streaming: true,
+          at: now,
+        },
+      ],
+      updatedAt: now,
+    };
+    setEditing(null);
+    setDraftText("");
+    void streamTurn(working, newText);
+  }, [active, draftText, editing, phase, streamTurn]);
 
   const lastReportMessage = useMemo(() => {
     if (!active) return null;
@@ -195,9 +338,8 @@ export function ChatApp() {
     return null;
   }, [active]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [active?.messages.length, phase]);
+  const canRegenerate = Boolean(active && phase === "idle" && active.messages.some((m) => m.role === "assistant"));
+  const lastAssistant = canRegenerate ? lastAssistantId(active) : null;
 
   return (
     <div className={`chat-app${artifactOpen && lastReportMessage ? " chat-app--artifact" : ""}`} data-stream={phase}>
@@ -212,11 +354,15 @@ export function ChatApp() {
           {[...conversations]
             .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
             .map((c) => (
-              <button key={c.id} className="conv-item" aria-current={c.id === activeId}
-                onClick={() => { setActiveId(c.id); setArtifactOpen(false); }}>
-                <span className="conv-item__title">{c.title}</span>
-                <span className="conv-item__meta">{relativeTime(c.updatedAt)} · 메시지 {c.messages.length}</span>
-              </button>
+              <div key={c.id} className="conv-item-row">
+                <button className="conv-item" aria-current={c.id === activeId}
+                  onClick={() => { setActiveId(c.id); setArtifactOpen(false); }}>
+                  <span className="conv-item__title">{c.title}</span>
+                  <span className="conv-item__meta">{relativeTime(c.updatedAt)} · 메시지 {c.messages.length}</span>
+                </button>
+                <button className="conv-item__delete" aria-label={`${c.title} 삭제`}
+                  onClick={() => deleteChat(c.id)}>✕</button>
+              </div>
             ))}
           {conversations.length === 0 && <p className="doc-empty">아직 대화가 없습니다</p>}
         </div>
@@ -230,13 +376,21 @@ export function ChatApp() {
         {!active || active.messages.length === 0 ? (
           <EmptyState onPick={(text) => send(text)} />
         ) : (
-          <div className="thread-scroll">
+          <div className="thread-scroll" ref={scrollRef} onScroll={handleScroll}>
             <div className="thread-inner">
               {active.messages.map((m) =>
                 m.role === "user" ? (
-                  <div key={m.id} className="turn-user">{m.text}</div>
+                  <div key={m.id} className="turn-user-group">
+                    <div className="turn-user">{m.text}</div>
+                    <div className="turn-user__actions">
+                      <button onClick={() => beginEdit(m.id)}>편집</button>
+                      <button onClick={() => navigator.clipboard?.writeText(m.text)}>복사</button>
+                    </div>
+                  </div>
                 ) : (
-                  <AssistantTurn key={m.id} message={m} onOpenArtifact={() => setArtifactOpen(true)} />
+                  <AssistantTurn key={m.id} message={m}
+                    onOpenArtifact={() => setArtifactOpen(true)}
+                    onRegenerate={m.id === lastAssistant ? regenerate : undefined} />
                 ),
               )}
               <div ref={bottomRef} />
@@ -244,13 +398,17 @@ export function ChatApp() {
           </div>
         )}
 
+        <button className="scroll-jump" onClick={jumpToBottom} aria-label="맨 아래로 이동">↓</button>
+
         <ComposerWrap
           value={draftText}
           onChange={setDraftText}
           mentions={mentions}
           onMentionsChange={setMentions}
-          onSubmit={() => send(draftText)}
+          onSubmit={() => (editing ? submitEdit() : send(draftText))}
+          onCancelEdit={editing ? cancelEdit : undefined}
           busy={phase !== "idle"}
+          onStop={stop}
         />
       </section>
 
@@ -263,6 +421,23 @@ export function ChatApp() {
   );
 }
 
+function lastAssistantId(conv) {
+  for (let i = conv.messages.length - 1; i >= 0; i -= 1) {
+    if (conv.messages[i].role === "assistant") return conv.messages[i].id;
+  }
+  return null;
+}
+
+function sleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timer);
+      reject(new DOMException("aborted", "AbortError"));
+    }, { once: true });
+  });
+}
+
 function EmptyState({ onPick }) {
   return (
     <div className="thread-scroll">
@@ -270,12 +445,7 @@ function EmptyState({ onPick }) {
         <h1>무엇이든 물어보세요</h1>
         <p>승인된 운영 데이터를 대상으로 근거가 있는 분석을 제공합니다.</p>
         <div className="suggestions">
-          {[
-            "지난주 객실 매출 추이를 보여줘",
-            "이번 달 회원 등급별 분포를 비교해줘",
-            "F&B 시간대별 매출 상위 메뉴는?",
-            "연회 예약 취소 사유 요약해줘",
-          ].map((text) => (
+          {SUGGESTIONS.map((text) => (
             <button key={text} className="suggestion" onClick={() => onPick(text)}>{text}</button>
           ))}
         </div>
@@ -284,8 +454,9 @@ function EmptyState({ onPick }) {
   );
 }
 
-function AssistantTurn({ message, onOpenArtifact }) {
+function AssistantTurn({ message, onOpenArtifact, onRegenerate }) {
   const [openSteps, setOpenSteps] = useState(message.streaming);
+  const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!message.streaming) setOpenSteps(false);
   }, [message.streaming]);
@@ -297,65 +468,60 @@ function AssistantTurn({ message, onOpenArtifact }) {
       <div className="turn-assistant__head">
         <span className="agent-dot" />
         {(message.agents.length ? message.agents : ["analyst"]).map((id) => AGENTS[id]?.name ?? id).join(" · ")}
-        {message.streaming && <em style={{ color: "var(--c-warn)", fontStyle: "normal", fontSize: 12 }}>분석 중…</em>}
+        {message.streaming && <em className="streaming-tag">분석 중…</em>}
+        {message.stopped && <em className="stopped-tag">중단됨</em>}
       </div>
 
-      {message.steps && message.streaming && (
-        <ol className="verify-steps">
-          {AGENT_TRACE_STEPS.map((step, i) => {
-            const st = message.steps[i]?.status ?? "idle";
-            return (
-              <li key={step.label}>
-                <span className={`step-dot step-dot--${st}`} />
-                {step.label}
-              </li>
-            );
-          })}
-        </ol>
-      )}
-      {message.steps && !message.streaming && !message.error && (
-        <button type="button" className="verify-chip" aria-expanded="false"
-          onClick={(e) => {
-            const list = e.currentTarget.nextElementSibling;
-            const open = list?.style.display !== "none";
-            if (list) list.style.display = open ? "none" : "flex";
-            e.currentTarget.setAttribute("aria-expanded", String(!open));
-          }}>
-          ✓ 7단계 검증 완료 ▾
-        </button>
-      )}
-      {message.steps && !message.streaming && (
-        <ol className="verify-steps" style={{ display: "none" }}>
-          {AGENT_TRACE_STEPS.map((step, i) => (
-            <li key={step.label}>
-              <span className="step-dot step-dot--done" />
-              {step.label}
-            </li>
-          ))}
-        </ol>
+      {message.steps && (
+        <>
+          <button type="button"
+            className={`verify-chip${message.streaming ? " verify-chip--running" : ""}`}
+            aria-expanded={openSteps}
+            onClick={() => setOpenSteps((v) => !v)}>
+            {message.streaming
+              ? "검증 진행 중"
+              : `${AGENT_TRACE_STEPS.filter((_, i) => message.steps[i]?.status === "done").length}/7 검증 완료 ▾`}
+          </button>
+          {openSteps && (
+            <ol className="verify-steps">
+              {AGENT_TRACE_STEPS.map((step, i) => {
+                const st = message.steps[i]?.status ?? "idle";
+                return (
+                  <li key={step.label}>
+                    <span className={`step-dot step-dot--${st}`} />
+                    {step.label}
+                    <small>{st === "done" ? "완료" : st === "running" ? "실행 중" : st === "blocked" ? "보류" : st === "failed" ? "실패" : "대기"}</small>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </>
       )}
 
-      {message.error && (
-        <p style={{ margin: 0, color: "var(--c-danger)", fontSize: 14 }}>{message.error}</p>
+      {message.error && <p style={{ margin: 0, color: "var(--c-danger)", fontSize: 14 }}>{message.error}</p>}
+      {(message.body || message.streaming) && (
+        <div className={`turn-assistant__body${message.streaming ? " turn-assistant__streaming" : ""}`}>
+          {message.body || ""}
+        </div>
       )}
-      {message.body && <div className="turn-assistant__body">{message.body}</div>}
       {!message.streaming && !message.body && !message.error && (
         <div className="turn-assistant__body">요청을 처리했습니다.</div>
       )}
 
       {message.result && <ResultBlock run={message.result} />}
 
-      {message.reportReady && !message.streaming && (
+      {!message.streaming && (
         <div className="msg-actions">
-          <button type="button" onClick={onOpenArtifact}>리포트로 정리</button>
-          <button type="button"
-            onClick={(e) => {
+          {message.reportReady && <button type="button" onClick={onOpenArtifact}>리포트로 정리</button>}
+          {message.body && (
+            <button type="button" onClick={(e) => {
               navigator.clipboard?.writeText(message.body ?? "");
-              e.currentTarget.textContent = "복사됨";
-              setTimeout(() => { e.currentTarget.textContent = "복사"; }, 1200);
-            }}>
-            복사
-          </button>
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1200);
+            }}>{copied ? "복사됨" : "복사"}</button>
+          )}
+          {onRegenerate && !message.error && <button type="button" onClick={onRegenerate}>다시 생성</button>}
         </div>
       )}
     </div>
@@ -394,14 +560,21 @@ function formatValue(value) {
   return String(value ?? "");
 }
 
-function ComposerWrap({ value, onChange, mentions, onMentionsChange, onSubmit, busy }) {
+function ComposerWrap({ value, onChange, mentions, onMentionsChange, onSubmit, onCancelEdit, busy, onStop }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const areaRef = useRef(null);
 
+  useEffect(() => {
+    const el = areaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+  }, [value]);
+
   const submit = () => {
     if (busy || !value.trim()) return;
-    onSubmit(value.trim());
-    setMenuOpen(false);
+    onSubmit();
+    if (areaRef.current) areaRef.current.style.height = "auto";
   };
 
   const pick = (id) => {
@@ -414,8 +587,14 @@ function ComposerWrap({ value, onChange, mentions, onMentionsChange, onSubmit, b
   return (
     <div className="composer-wrap">
       <div className="composer">
-        {mentions.length > 0 && (
+        {(mentions.length > 0 || onCancelEdit) && (
           <div className="composer__chips">
+            {onCancelEdit && (
+              <span className="chip-agent chip-agent--editing">
+                ✎ 메시지 수정 중
+                <button type="button" onClick={onCancelEdit}>취소</button>
+              </span>
+            )}
             {mentions.map((id) => (
               <span className="chip-agent" key={id}>
                 <span className="agent-dot" style={{ "--agent-hue": AGENT_HUES[id] }} />
@@ -427,10 +606,7 @@ function ComposerWrap({ value, onChange, mentions, onMentionsChange, onSubmit, b
           </div>
         )}
         <div className="composer__row" style={{ position: "relative" }}>
-          <button type="button" style={{
-            height: 34, padding: "0 10px", border: "1px solid var(--c-line)",
-            borderRadius: 8, background: "#fff", color: "var(--c-ink-2)", fontSize: 13,
-          }} aria-haspopup="listbox" aria-expanded={menuOpen}
+          <button type="button" className="composer__agent-btn" aria-haspopup="listbox" aria-expanded={menuOpen}
             onClick={() => setMenuOpen((v) => !v)}>@ 에이전트</button>
           {menuOpen && (
             <div className="agent-menu" role="listbox">
@@ -444,23 +620,30 @@ function ComposerWrap({ value, onChange, mentions, onMentionsChange, onSubmit, b
             </div>
           )}
           <textarea ref={areaRef} rows={1} value={value}
-            placeholder="질문을 입력하세요 (@로 에이전트 지정)"
+            placeholder="질문을 입력하세요 (@로 에이전트 지정, Enter 전송)"
             aria-label="분석 질문"
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={(e) => {
-              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); submit(); }
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                submit();
+              }
             }}
           />
-          <button className="composer__send" disabled={busy || !value.trim()} onClick={submit} aria-label="전송">↑</button>
+          {busy ? (
+            <button className="composer__send composer__send--stop" onClick={onStop} aria-label="중단"><StopIcon /></button>
+          ) : (
+            <button className="composer__send" disabled={!value.trim()} onClick={submit} aria-label="전송">↑</button>
+          )}
         </div>
       </div>
-      <p className="composer__hint">⌘↩ 전송 · 응답은 승인된 합성 데이터 기준으로 검증됩니다</p>
+      <p className="composer__hint">Enter 전송 · Shift+Enter 줄바꿈 · 응답은 승인된 합성 데이터 기준으로 검증됩니다</p>
     </div>
   );
 }
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
+function StopIcon() {
+  return <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>;
 }
 
 function PlusIcon() {
